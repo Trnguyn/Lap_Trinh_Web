@@ -1,0 +1,11 @@
+﻿# Node / Next.js
+node_modules
+.next
+# .env
+.env*
+# .NET build
+**/bin/
+**/obj/
+# Misc
+dist
+coverage

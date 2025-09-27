@@ -1,0 +1,533 @@
+# Chuẩn bị môi trường (Sprint 0)
+
+> Mục tiêu: Dựng monorepo, chạy Postgres bằng Docker, tạo skeleton API + Web, có Swagger trống và trang Next.js Hello.
+
+## 0. Cài đặt bắt buộc
+
+* **Node.js LTS ≥ 20** và **pnpm**: `npm i -g pnpm`
+* **.NET SDK 8/9**: [https://dotnet.microsoft.com/download](https://dotnet.microsoft.com/download)
+* **Docker Desktop** (hoặc Podman)
+* **PostgreSQL** (sẽ dùng Docker Compose)
+* **Git**, **VS Code** (extensions: ESLint, Prettier, Tailwind CSS, C#)
+
+---
+
+## 1. Tạo monorepo & scaffold
+
+```bash
+# tạo thư mục gốc
+mkdir jhfigure-clone && cd jhfigure-clone
+
+# tạo layout monorepo
+mkdir -p app/web app/api
+
+git init -b main
+```
+
+### 1.1. `.editorconfig` (gốc repo)
+
+```ini
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[*.cs]
+indent_size = 4
+
+[*.{ts,tsx,js,jsx,json}]
+quote_type = single
+max_line_length = 120
+```
+
+### 1.2. `.gitignore` (gốc repo)
+
+```gitignore
+# Node/Next
+node_modules
+.next
+out
+.env*
+
+# .NET
+**/bin/
+**/obj/
+**/.vs/
+**/appsettings.*.Local.json
+UserSecrets/
+
+# Docker
+*.pid
+
+# OS
+.DS_Store
+Thumbs.db
+```
+
+---
+
+## 2. Docker Compose cho Postgres
+
+Tạo `docker/docker-compose.yml`:
+
+```yaml
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: shopdb
+    ports: ["5432:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports: ["5050:80"]
+volumes:
+  dbdata:
+```
+
+Chạy DB:
+
+```bash
+cd docker
+docker compose up -d
+cd ..
+```
+
+---
+
+## 3. Backend API – ASP.NET Core
+
+### 3.1. Khởi tạo project
+
+```bash
+cd app/api
+
+# webapi + Swashbuckle sẵn
+dotnet new webapi -n JHF.Api
+cd JHF.Api
+```
+
+### 3.2. Cài package
+
+```bash
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
+dotnet add package Microsoft.EntityFrameworkCore.Design
+dotnet add package FluentValidation.AspNetCore
+dotnet add package Serilog.AspNetCore
+dotnet add package Swashbuckle.AspNetCore
+dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
+dotnet add package AutoMapper.Extensions.Microsoft.DependencyInjection
+```
+
+### 3.3. Cấu hình `appsettings.Development.json`
+
+```json
+{
+  "ConnectionStrings": {
+    "Default": "Host=localhost;Port=5432;Database=shopdb;Username=app;Password=app"
+  },
+  "Jwt": {
+    "Issuer": "jhfigure-clone",
+    "Audience": "jhfigure-clone",
+    "Secret": "CHANGE_ME_TO_A_LONG_RANDOM_SECRET",
+    "AccessTokenMinutes": 15,
+    "RefreshTokenDays": 7
+  },
+  "Serilog": {
+    "MinimumLevel": "Information"
+  },
+  "AllowedHosts": "*"
+}
+```
+
+### 3.4. Thư mục & lớp
+
+Tạo các thư mục:
+
+```
+/Domain
+/Application
+/Infrastructure
+/Presentation
+```
+
+#### 3.4.1. Entity mẫu (Domain/Entities)
+
+`Domain/Entities/Product.cs`
+
+```csharp
+namespace JHF.Api.Domain.Entities;
+
+public class Product
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public decimal Price { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int CategoryId { get; set; }
+    public Category? Category { get; set; }
+    public int BrandId { get; set; }
+    public Brand? Brand { get; set; }
+    public List<ProductImage> Images { get; set; } = new();
+}
+```
+
+`Domain/Entities/Category.cs`
+
+```csharp
+namespace JHF.Api.Domain.Entities;
+
+public class Category
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public int? ParentId { get; set; }
+}
+```
+
+`Domain/Entities/Brand.cs`
+
+```csharp
+namespace JHF.Api.Domain.Entities;
+
+public class Brand
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public String Slug { get; set; } = string.Empty;
+}
+```
+
+`Domain/Entities/ProductImage.cs`
+
+```csharp
+namespace JHF.Api.Domain.Entities;
+
+public class ProductImage
+{
+    public int Id { get; set; }
+    public int ProductId { get; set; }
+    public string Url { get; set; } = string.Empty;
+    public bool IsPrimary { get; set; }
+}
+```
+
+#### 3.4.2. DbContext (Infrastructure)
+
+`Infrastructure/AppDbContext.cs`
+
+```csharp
+using JHF.Api.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace JHF.Api.Infrastructure;
+
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+{
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Category> Categories => Set<Category>();
+    public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+
+    protected override void OnModelCreating(ModelBuilder b)
+    {
+        b.Entity<Product>().HasIndex(x => x.Slug).IsUnique();
+        b.Entity<Category>().HasIndex(x => x.Slug).IsUnique();
+        b.Entity<Brand>().HasIndex(x => x.Slug).IsUnique();
+        b.Entity<ProductImage>()
+          .HasOne<Product>()
+          .WithMany(p => p.Images)
+          .HasForeignKey(pi => pi.ProductId);
+    }
+}
+```
+
+#### 3.4.3. Seed dữ liệu (Infrastructure/Seed)
+
+`Infrastructure/Seed/DbSeeder.cs`
+
+```csharp
+using JHF.Api.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace JHF.Api.Infrastructure.Seed;
+
+public static class DbSeeder
+{
+    public static async Task SeedAsync(AppDbContext db)
+    {
+        await db.Database.MigrateAsync();
+
+        if (!await db.Categories.AnyAsync())
+        {
+            db.Categories.AddRange(
+                new Category { Name = "Figures", Slug = "figures" },
+                new Category { Name = "Nendoroid", Slug = "nendoroid" }
+            );
+        }
+        if (!await db.Brands.AnyAsync())
+        {
+            db.Brands.AddRange(
+                new Brand { Name = "Good Smile Company", Slug = "gsc" },
+                new Brand { Name = "Bandai", Slug = "bandai" }
+            );
+        }
+        if (!await db.Products.AnyAsync())
+        {
+            db.Products.Add(new Product {
+                Name = "Sample Figure A",
+                Slug = "sample-figure-a",
+                Description = "Demo product",
+                Price = 99.90m,
+                CategoryId = await db.Categories.Where(c=>c.Slug=="figures").Select(c=>c.Id).FirstAsync(),
+                BrandId = await db.Brands.Where(b=>b.Slug=="gsc").Select(b=>b.Id).FirstAsync(),
+                Images = new(){ new ProductImage{ Url = "/images/sample-a.jpg", IsPrimary = true } }
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+}
+```
+
+#### 3.4.4. Program.cs (Presentation)
+
+`Program.cs`
+
+```csharp
+using JHF.Api.Infrastructure;
+using JHF.Api.Infrastructure.Seed;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Db
+builder.Services.AddDbContext<AppDbContext>(opt =>
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+
+// Controllers & Swagger
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var app = builder.Build();
+
+// Migrate + Seed on startup (dev only)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await DbSeeder.SeedAsync(db);
+}
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.MapControllers();
+app.Run();
+```
+
+#### 3.4.5. Controller tối thiểu (Products)
+
+`Presentation/Controllers/ProductsController.cs`
+
+```csharp
+using JHF.Api.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace JHF.Api.Presentation.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class ProductsController(AppDbContext db) : ControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 12)
+    {
+        var query = db.Products.Include(p=>p.Images).AsNoTracking();
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderBy(p => p.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new {
+                p.Id, p.Name, p.Slug, p.Price,
+                Image = p.Images.OrderByDescending(i=>i.IsPrimary).Select(i=>i.Url).FirstOrDefault()
+            })
+            .ToListAsync();
+        return Ok(new { total, page, pageSize, items });
+    }
+
+    [HttpGet("{slug}")]
+    public async Task<IActionResult> GetBySlug(string slug)
+    {
+        var product = await db.Products.Include(p=>p.Images)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Slug == slug);
+        return product is null ? NotFound() : Ok(product);
+    }
+}
+```
+
+### 3.5. Tạo migration & chạy API
+
+```bash
+# quay về thư mục project API nếu chưa ở đó
+cd app/api/JHF.Api
+
+# cài tool ef nếu chưa có
+dotnet tool install --global dotnet-ef
+
+# tạo migration và update DB
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+
+# chạy API
+dotnet run
+# Swagger tại https://localhost:5001/swagger (port thực tế in ra khi chạy)
+```
+
+---
+
+## 4. Frontend – Next.js 14 + Tailwind
+
+### 4.1. Khởi tạo dự án
+
+```bash
+cd ../../../app/web
+pnpm dlx create-next-app@latest . \
+  --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-pnpm
+```
+
+### 4.2. Cài thư viện
+
+```bash
+pnpm add axios @tanstack/react-query zod react-hook-form
+```
+
+### 4.3. Env frontend
+
+Tạo `./.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE=http://localhost:5001
+```
+
+### 4.4. API client
+
+`src/lib/api.ts`
+
+```ts
+import axios from 'axios';
+
+export const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE,
+  withCredentials: true,
+});
+```
+
+### 4.5. Trang Home – gọi API sản phẩm
+
+`src/app/page.tsx`
+
+```tsx
+import { api } from '@/lib/api';
+
+async function getProducts() {
+  const res = await api.get('/api/products?page=1&pageSize=12', { headers: { 'accept': 'application/json' } });
+  return res.data as { items: { id:number; name:string; slug:string; price:number; image?:string }[] };
+}
+
+export default async function Page() {
+  const data = await getProducts();
+  return (
+    <main className="max-w-6xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-semibold mb-6">Catalog</h1>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        {data.items.map(p => (
+          <a key={p.id} href={`/products/${p.slug}`} className="border rounded-lg p-4 hover:shadow">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.image ?? '/placeholder.png'} alt={p.name} className="w-full h-40 object-cover mb-3" />
+            <div className="font-medium">{p.name}</div>
+            <div className="text-sm opacity-70">${p.price.toFixed(2)}</div>
+          </a>
+        ))}
+      </div>
+    </main>
+  );
+}
+```
+
+### 4.6. Trang chi tiết sản phẩm
+
+`src/app/products/[slug]/page.tsx`
+
+```tsx
+import { api } from '@/lib/api';
+
+async function getProduct(slug: string) {
+  const res = await api.get(`/api/products/${slug}`, { headers: { 'accept': 'application/json' } });
+  return res.data as { id:number; name:string; description?:string; price:number; images:{url:string}[] };
+}
+
+export default async function ProductPage({ params }: { params: { slug: string } }) {
+  const p = await getProduct(params.slug);
+  return (
+    <main className="max-w-4xl mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={p.images?.[0]?.url ?? '/placeholder.png'} alt={p.name} className="w-full rounded-xl" />
+        <div>
+          <h1 className="text-2xl font-semibold mb-2">{p.name}</h1>
+          <div className="text-lg mb-4">${p.price.toFixed(2)}</div>
+          <p className="opacity-80 mb-6">{p.description ?? 'No description yet.'}</p>
+          <button className="px-4 py-2 rounded-xl bg-black text-white">Add to cart</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+### 4.7. Chạy web
+
+```bash
+pnpm dev
+# http://localhost:3000
+```
+
+---
+
+## 5. Kiểm tra nhanh “đã lên hình”
+
+1. `docker compose up -d` (DB chạy)
+2. `dotnet ef database update` (đã migrate) và `dotnet run` (API + Swagger)
+3. `pnpm dev` (Next.js)
+4. Trang Home hiển thị 1 sản phẩm demo từ seed; bấm vào chi tiết hiển thị mô tả/ảnh.
+
+---
+
+## 6. Tiếp theo (bước mở Sprint 1)
+
+* Thêm endpoint `GET /api/categories`, `GET /api/brands`, filter theo `category`, `brand`, `min`, `max`.
+* Tách DTO `ProductListItemDto`, `ProductDetailDto` + AutoMapper profile.
+* Bổ sung phân trang chuẩn (page, pageSize, totalPages).
+* Hoàn thiện UI filter ở Next.js (query params ↔ server).
+
+> Skeleton này đủ để bắt đầu lộ trình đã chốt. Cứ theo đúng file/command ở trên, bạn sẽ có một bản chạy được để demo và mở rộng dần (auth, cart, order, admin).
