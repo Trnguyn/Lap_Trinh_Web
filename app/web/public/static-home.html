@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JHF | Catalog</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    :root{
+      --bg:#0b0b0c;--panel:#111214;--panel-2:#17181b;--text:#eaeaea;
+      --muted:#9aa0a6;--primary:#3b82f6;--success:#10b981;--danger:#ef4444;
+      --ring:#2a2d33;--radius:16px;--shadow:0 10px 30px rgba(0,0,0,.35)
+    }
+    body{background:var(--bg);color:var(--text);font:16px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    a{color:inherit;text-decoration:none}
+    .container{max-width:1200px;margin-inline:auto;padding:24px}
+    .header{display:flex;align-items:center;gap:16px;justify-content:space-between;margin-bottom:24px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.2px}
+    .brand__dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(45deg,var(--primary),#8b5cf6)}
+    .search{display:flex;gap:8px}
+    .search input{width:min(420px,70vw);background:var(--panel);border:1px solid var(--ring);color:var(--text);padding:10px 12px;border-radius:12px;outline:none}
+    .search button{background:var(--primary);border:0;color:#fff;padding:10px 14px;border-radius:12px;cursor:pointer}
+
+    .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+    .chip{border:1px solid var(--ring);background:var(--panel);padding:8px 12px;border-radius:999px;color:var(--muted);font-size:.9rem}
+    .chip.is-active{background:var(--panel-2);color:var(--text);border-color:#3a3d44}
+
+    .row{display:grid;gap:24px}
+    .grid{grid-template-columns:repeat(12,1fr)}
+    @media (max-width:1024px){.grid{grid-template-columns:repeat(8,1fr)}}
+    @media (max-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
+    .col-3{grid-column:span 3}
+    @media (max-width:1024px){.col-3{grid-column:span 4}}
+    @media (max-width:640px){.col-3{grid-column:span 4}}
+
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--ring);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+    .card__media{position:relative;aspect-ratio:4/3;background:#0f1114}
+    .card__media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .35s ease}
+    .card:hover img{transform:scale(1.04)}
+    .badge{position:absolute;top:10px;left:10px;background:var(--primary);color:#fff;font-size:.75rem;padding:6px 10px;border-radius:999px}
+    .badge--sale{background:var(--danger)}
+    .card__body{padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+    .brand-name{font-size:.82rem;color:var(--muted)}
+    .title{font-weight:600}
+    .price{display:flex;align-items:center;gap:8px;margin-top:6px}
+    .price__now{color:var(--success);font-weight:700}
+    .price__old{color:var(--muted);text-decoration:line-through}
+    .slug{font-size:.8rem;color:#7f858c}
+    .card__footer{margin-top:10px;display:flex;gap:8px}
+    .btn{flex:1;text-align:center;padding:10px 12px;border-radius:12px;border:1px solid var(--ring);background:transparent;color:var(--text);cursor:pointer}
+    .btn.primary{background:var(--primary);border-color:transparent;color:#fff}
+  </style>
+</head>
+<body>
+  <header class="container header">
+    <div class="brand"><span class="brand__dot"></span> JHF Store</div>
+    <form class="search" role="search" action="#">
+      <input type="search" placeholder="Tìm figurine, hãng, series… (demo HTML)">
+      <button type="submit">Search</button>
+    </form>
+  </header>
+
+  <main class="container">
+    <section class="row">
+      <h2 style="margin:0 0 12px 0;">Catalog</h2>
+      <div class="filters">
+        <span class="chip is-active">Tất cả</span>
+        <span class="chip">Good Smile</span>
+        <span class="chip">Bandai</span>
+        <span class="chip">Preorder</span>
+        <span class="chip">Flash Sale</span>
+      </div>
+
+      <div class="row grid">
+        <article class="col-3">
+          <a class="card" href="/product/pup-suisei">
+            <div class="card__media">
+              <img src="https://picsum.photos/id/1027/800/600" alt="POP UP PARADE Hoshimachi Suisei">
+              <span class="badge">Preorder</span>
+            </div>
+            <div class="card__body">
+              <div class="brand-name">Good Smile Company</div>
+              <div class="title">POP UP PARADE Hoshimachi Suisei</div>
+              <div class="price"><span class="price__now">49.99 $</span> <span class="price__old">59.99 $</span></div>
+              <div class="slug">pup-suisei</div>
+              <div class="card__footer"><span class="btn">Chi tiết</span><span class="btn primary">Thêm vào giỏ</span></div>
+            </div>
+          </a>
+        </article>
+
+        <article class="col-3">
+          <a class="card" href="/product/figuarts-nezuko">
+            <div class="card__media">
+              <img src="https://picsum.photos/id/1060/800/600" alt="Figuarts Mini Nezuko">
+              <span class="badge badge--sale">Flash sale</span>
+            </div>
+            <div class="card__body">
+              <div class="brand-name">Bandai</div>
+              <div class="title">Figuarts Mini Nezuko</div>
+              <div class="price"><span class="price__now">24.90 $</span></div>
+              <div class="slug">figuarts-nezuko</div>
+              <div class="card__footer"><span class="btn">Chi tiết</span><span class="btn primary">Thêm vào giỏ</span></div>
+            </div>
+          </a>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
