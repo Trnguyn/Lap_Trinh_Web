@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
             e.Property(x => x.Description).HasColumnName("description");
             e.Property(x => x.BrandId).HasColumnName("brand_id");
             e.Property<string>("preorder_status").HasColumnName("preorder_status");
+            e.Property<DateTimeOffset?>("created_at").HasColumnName("created_at");
         });
 
         b.Entity<Brand>(e =>
