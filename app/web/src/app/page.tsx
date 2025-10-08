@@ -1,4 +1,6 @@
+// src/app/page.tsx
 import Image from "next/image";
+import Link from "next/link";
 
 type ProductItem = {
   id: number;
@@ -15,57 +17,83 @@ async function getProducts() {
   const base = process.env.NEXT_PUBLIC_API_BASE!;
   const res = await fetch(`${base}/api/products?page=1&pageSize=12`, {
     headers: { accept: "application/json" },
-    cache: "no-store", // tránh cache khi dev
+    cache: "no-store",
   });
-  if (!res.ok) throw new Error("Failed to fetch products");
+  if (!res.ok) throw new Error(`Failed to fetch products: ${res.status}`);
   return (await res.json()) as { total: number; items: ProductItem[] };
 }
 
 export default async function Home() {
-  const data = await getProducts();
+  // Bọc lỗi để không làm page đen thui khi API chết
+  let data: { total: number; items: ProductItem[] } = { total: 0, items: [] };
+  try {
+    data = await getProducts();
+  } catch (err) {
+    // Log server (hiển thị lỗi trong console server)
+    console.error(err);
+  }
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-semibold mb-6">Catalog</h1>
 
-      <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-        {data.items.map((p) => (
-          <li
-            key={p.id}
-            className="rounded-2xl border shadow-sm hover:shadow-md transition overflow-hidden"
-          >
-            <div className="aspect-[4/3] relative bg-gray-50">
-              {p.imageUrl ? (
-                <Image src={p.imageUrl} alt={p.name} fill className="object-cover" />
-              ) : (
-                <div className="absolute inset-0 grid place-items-center text-gray-400">
-                  No image
+      {data.items.length === 0 ? (
+        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-gray-500">
+          Không có sản phẩm để hiển thị. Kiểm tra API hoặc seed dữ liệu nhé.
+        </div>
+      ) : (
+        <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+          {data.items.map((p) => (
+            <li
+              key={p.id}
+              className="rounded-2xl border shadow-sm hover:shadow-md transition overflow-hidden bg-white"
+            >
+              <Link href={`/product/${p.slug}`}>
+                <div className="aspect-[4/3] relative bg-gray-50">
+                  {p.imageUrl ? (
+                    <Image
+                      src={p.imageUrl}
+                      alt={p.name}
+                      fill
+                      sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 grid place-items-center text-gray-400">
+                      No image
+                    </div>
+                  )}
+
+                  {p.isOnSale && (
+                    <span className="absolute left-2 top-2 text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">
+                      Flash sale
+                    </span>
+                  )}
+                  {p.preorderStatus === "PREORDER" && (
+                    <span className="absolute right-2 top-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                      Preorder
+                    </span>
+                  )}
                 </div>
-              )}
+              </Link>
 
-              {p.isOnSale && (
-                <span className="absolute left-2 top-2 text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">
-                  Flash sale
-                </span>
-              )}
-              {p.preorderStatus === "PREORDER" && (
-                <span className="absolute right-2 top-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">
-                  Preorder
-                </span>
-              )}
-            </div>
-
-            <div className="p-4">
-              <div className="text-sm text-gray-500">{p.brand || "—"}</div>
-              <div className="font-medium">{p.name}</div>
-              <div className="mt-1 text-emerald-700 font-semibold">
-                {p.price.toFixed(2)} $
+              <div className="p-4">
+                <div className="text-sm text-gray-500">{p.brand || "—"}</div>
+                <Link
+                  href={`/product/${p.slug}`}
+                  className="font-medium hover:underline"
+                >
+                  {p.name}
+                </Link>
+                <div className="mt-1 text-emerald-700 font-semibold">
+                  {p.price.toFixed(2)} $
+                </div>
+                <div className="text-xs text-gray-400">{p.slug}</div>
               </div>
-              <div className="text-xs text-gray-400">{p.slug}</div>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }
